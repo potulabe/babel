@@ -4,7 +4,6 @@ Code to train a model
 
 import argparse
 import copy
-import functools
 import itertools
 import logging
 import os
@@ -18,7 +17,6 @@ import torch
 import torch.nn as nn
 
 import babel.activations as activations
-import babel.adata_utils as adata_utils
 import babel.loss_functions as loss_functions
 import babel.model_utils as model_utils
 import babel.models.autoencoders as autoencoders
@@ -195,59 +193,70 @@ def main():
     fh = logging.FileHandler(f"{args.outdir}_training.log", "w")
     fh.setLevel(logging.INFO)
     logger.addHandler(fh)
+    for arg in vars(args):
+        logging.info(f"Parameter {arg}: {getattr(args, arg)}")
+    do_train_model(
+            args.data_RNA,
+            args.data_ATAC,
+            args.nofilter,
+            args.linear,
+            args.clustermethod,
+            args.rna_normalised,
+            args.atac_normalised,
+            args.validcluster,
+            args.testcluster,
+            args.hidden, args.lossweight, args.lr, args.batchsize,
+            args.earlystop,
+            args.seed,
+            args.outdir,
+            args.naive,
+            args.optim,
+            args.device,
+            args.pretrain,
+            args.ext
+    )
 
+
+def do_train_model(
+        data_RNA,
+        data_ATAC,
+        nofilter,
+        linear,
+        clustermethod,
+        rna_normalised,
+        atac_normalised,
+        validcluster,
+        testcluster,
+        hidden, lossweight, lr, batchsize,
+        earlystop,
+        seed,
+        outdir,
+        naive,
+        optim,
+        device,
+        pretrain,
+        ext
+):
     # Log parameters and pytorch version
     if torch.cuda.is_available():
         logging.info(f"PyTorch CUDA version: {torch.version.cuda}")
-    for arg in vars(args):
-        logging.info(f"Parameter {arg}: {getattr(args, arg)}")
 
     # Borrow parameters
     logging.info("Reading RNA data")
-    if args.snareseq:
-        rna_data_kwargs = copy.copy(sc_data_loaders.SNARESEQ_RNA_DATA_KWARGS)
-    elif args.shareseq:
-        logging.info(f"Loading in SHAREseq RNA data for: {args.shareseq}")
-        rna_data_kwargs = copy.copy(sc_data_loaders.SNARESEQ_RNA_DATA_KWARGS)
-        rna_data_kwargs["fname"] = None
-        rna_data_kwargs["reader"] = None
-        rna_data_kwargs["cell_info"] = None
-        rna_data_kwargs["gene_info"] = None
-        rna_data_kwargs["transpose"] = False
-        # Load in the datasets
-        shareseq_rna_adatas = []
-        for tissuetype in args.shareseq:
-            shareseq_rna_adatas.append(
-                adata_utils.load_shareseq_data(
-                    tissuetype,
-                    dirname="/data/wukevin/commonspace_data/GSE140203_SHAREseq",
-                    mode="RNA",
-                )
-            )
-        shareseq_rna_adata = shareseq_rna_adatas[0]
-        if len(shareseq_rna_adatas) > 1:
-            shareseq_rna_adata = shareseq_rna_adata.concatenate(
-                *shareseq_rna_adatas[1:],
-                join="inner",
-                batch_key="tissue",
-                batch_categories=args.shareseq,
-            )
-        rna_data_kwargs["raw_adata"] = shareseq_rna_adata
-    else:
-        rna_data_kwargs = copy.copy(sc_data_loaders.TENX_PBMC_RNA_DATA_KWARGS)
-        rna_data = utils.read_adata(args.data_RNA)
-        rna_data_kwargs["raw_adata"] = rna_data
-        if args.nofilter:
-            rna_data_kwargs = {
-                k: v for k, v in rna_data_kwargs.items() if not k.startswith("filt_")
-            }
-    rna_data_kwargs["data_split_by_cluster_log"] = not args.linear
-    rna_data_kwargs["data_split_by_cluster"] = args.clustermethod  # TODO
-    rna_data_kwargs["normalised"] = args.rna_normalised
+    rna_data_kwargs = copy.copy(sc_data_loaders.TENX_PBMC_RNA_DATA_KWARGS)
+    rna_data = utils.read_adata(data_RNA)
+    rna_data_kwargs["raw_adata"] = rna_data
+    if nofilter:
+        rna_data_kwargs = {
+            k: v for k, v in rna_data_kwargs.items() if not k.startswith("filt_")
+        }
+    rna_data_kwargs["data_split_by_cluster_log"] = not linear
+    rna_data_kwargs["data_split_by_cluster"] = clustermethod  # TODO
+    rna_data_kwargs["normalised"] = rna_normalised
 
     sc_rna_dataset = sc_data_loaders.SingleCellDataset(
-        valid_cluster_id=args.validcluster,  # TODO
-        test_cluster_id=args.testcluster,  # TODO
+        valid_cluster_id=validcluster,  # TODO
+        test_cluster_id=testcluster,  # TODO
         **rna_data_kwargs,
     )
 
@@ -262,71 +271,36 @@ def main():
     )
 
     # ATAC
-    logging.info("Aggregating ATAC clusters")
-    if args.snareseq:
-        atac_data_kwargs = copy.copy(sc_data_loaders.SNARESEQ_ATAC_DATA_KWARGS)
-    elif args.shareseq:
-        logging.info(f"Loading in SHAREseq ATAC data for {args.shareseq}")
-        atac_data_kwargs = copy.copy(sc_data_loaders.SNARESEQ_ATAC_DATA_KWARGS)
-        atac_data_kwargs["reader"] = None
-        atac_data_kwargs["fname"] = None
-        atac_data_kwargs["cell_info"] = None
-        atac_data_kwargs["gene_info"] = None
-        atac_data_kwargs["transpose"] = False
-        atac_adatas = []
-        for tissuetype in args.shareseq:
-            atac_adatas.append(
-                adata_utils.load_shareseq_data(
-                    tissuetype,
-                    dirname="/data/wukevin/commonspace_data/GSE140203_SHAREseq",
-                    mode="ATAC",
-                )
-            )
-        atac_bins = [a.var_names for a in atac_adatas]
-        if len(atac_adatas) > 1:
-            atac_bins_harmonized = sc_data_loaders.harmonize_atac_intervals(*atac_bins)
-            atac_adatas = [
-                sc_data_loaders.repool_atac_bins(a, atac_bins_harmonized)
-                for a in atac_adatas
-            ]
-        shareseq_atac_adata = atac_adatas[0]
-        if len(atac_adatas) > 1:
-            shareseq_atac_adata = shareseq_atac_adata.concatenate(
-                *atac_adatas[1:],
-                join="inner",
-                batch_key="tissue",
-                batch_categories=args.shareseq,
-            )
-        atac_data_kwargs["raw_adata"] = shareseq_atac_adata
-    else:
-        # atac_parsed = [
-        #     utils.sc_read_10x_h5_ft_type(fname, "Peaks") for fname in args.data
-        # ]
-        # if len(atac_parsed) > 1:
-        #     atac_bins = sc_data_loaders.harmonize_atac_intervals(
-        #         atac_parsed[0].var_names, atac_parsed[1].var_names
-        #     )
-        #     for bins in atac_parsed[2:]:
-        #         atac_bins = sc_data_loaders.harmonize_atac_intervals(
-        #             atac_bins, bins.var_names
-        #         )
-        #     logging.info(f"Aggregated {len(atac_bins)} bins")
-        # else:
-        #     atac_bins = list(atac_parsed[0].var_names)
-        atac_data = utils.read_adata(args.data_ATAC)
+    # logging.info("Aggregating ATAC clusters")
+    
+    # atac_parsed = [
+    #     utils.sc_read_10x_h5_ft_type(fname, "Peaks") for fname in args.data
+    # ]
+    # if len(atac_parsed) > 1:
+    #     atac_bins = sc_data_loaders.harmonize_atac_intervals(
+    #         atac_parsed[0].var_names, atac_parsed[1].var_names
+    #     )
+    #     for bins in atac_parsed[2:]:
+    #         atac_bins = sc_data_loaders.harmonize_atac_intervals(
+    #             atac_bins, bins.var_names
+    #         )
+    #     logging.info(f"Aggregated {len(atac_bins)} bins")
+    # else:
+    #     atac_bins = list(atac_parsed[0].var_names)
+    atac_data = utils.read_adata(data_ATAC)
 
-        atac_data_kwargs = copy.copy(sc_data_loaders.TENX_PBMC_ATAC_DATA_KWARGS)
-        # atac_data_kwargs["fname"] = rna_data_kwargs["fname"]
-        atac_data_kwargs["raw_adata"] = atac_data
-        atac_data_kwargs["pool_genomic_interval"] = 0  # Do not pool
-        # atac_data_kwargs["reader"] = functools.partial(
-        #     utils.sc_read_multi_files,
-        #     reader=lambda x: sc_data_loaders.repool_atac_bins(
-        #         utils.sc_read_10x_h5_ft_type(x, "Peaks"), atac_bins,
-        #     ),
-        # )
+    atac_data_kwargs = copy.copy(sc_data_loaders.TENX_PBMC_ATAC_DATA_KWARGS)
+    # atac_data_kwargs["fname"] = rna_data_kwargs["fname"]
+    atac_data_kwargs["raw_adata"] = atac_data
+    atac_data_kwargs["pool_genomic_interval"] = 0  # Do not pool
+    # atac_data_kwargs["reader"] = functools.partial(
+    #     utils.sc_read_multi_files,
+    #     reader=lambda x: sc_data_loaders.repool_atac_bins(
+    #         utils.sc_read_10x_h5_ft_type(x, "Peaks"), atac_bins,
+    #     ),
+    # )
     atac_data_kwargs["cluster_res"] = 0  # Do not bother clustering ATAC data
-    atac_data_kwargs["normalised"] = args.atac_normalised
+    atac_data_kwargs["normalised"] = atac_normalised
 
     sc_atac_dataset = sc_data_loaders.SingleCellDataset(
         predefined_split=sc_rna_dataset, **atac_data_kwargs
@@ -350,21 +324,21 @@ def main():
     sc_dual_test_dataset = sc_data_loaders.PairedDataset(
         sc_rna_test_dataset, sc_atac_test_dataset, flat_mode=True,
     )
-    sc_dual_full_dataset = sc_data_loaders.PairedDataset(
-        sc_rna_dataset, sc_atac_dataset, flat_mode=True,
-    )
+    # sc_dual_full_dataset = sc_data_loaders.PairedDataset(
+    #     sc_rna_dataset, sc_atac_dataset, flat_mode=True,
+    # )
 
     # Model
     param_combos = list(
         itertools.product(
-            args.hidden, args.lossweight, args.lr, args.batchsize, args.seed
+            hidden, lossweight, lr, batchsize, seed
         )
     )
     for h_dim, lw, lr, bs, rand_seed in param_combos:
         outdir_name = (
-            f"{args.outdir}_hidden_{h_dim}_lossweight_{lw}_lr_{lr}_batchsize_{bs}_seed_{rand_seed}"
+            f"{outdir}_hidden_{h_dim}_lossweight_{lw}_lr_{lr}_batchsize_{bs}_seed_{rand_seed}"
             if len(param_combos) > 1
-            else args.outdir
+            else outdir
         )
         if not os.path.isdir(outdir_name):
             assert not os.path.exists(outdir_name)
@@ -412,7 +386,7 @@ def main():
         # Instantiate and train model
         model_class = (
             autoencoders.NaiveSplicedAutoEncoder
-            if args.naive
+            if naive
             else autoencoders.AssymSplicedAutoEncoder
         )
         spliced_net = autoencoders.SplicedAutoEncoderSkorchNet(
@@ -432,13 +406,13 @@ def main():
             criterion__loss2=loss_functions.BCELoss,  # handle output of encoded layer
             criterion__loss2_weight=lw,  # numerically balance the two losses with different magnitudes
             criterion__record_history=True,
-            optimizer=OPTIMIZER_DICT[args.optim],
+            optimizer=OPTIMIZER_DICT[optim],
             iterator_train__shuffle=True,
-            device=utils.get_device(args.device),
+            device=utils.get_device(device),
             batch_size=bs,  # Based on  hyperparam tuning
             max_epochs=500,
             callbacks=[
-                skorch.callbacks.EarlyStopping(patience=args.earlystop),
+                skorch.callbacks.EarlyStopping(patience=earlystop),
                 skorch.callbacks.LRScheduler(
                     policy=torch.optim.lr_scheduler.ReduceLROnPlateau,
                     **model_utils.REDUCE_LR_ON_PLATEAU_PARAMS,
@@ -452,15 +426,15 @@ def main():
             iterator_train__num_workers=8,
             iterator_valid__num_workers=8,
         )
-        if args.pretrain:
+        if pretrain:
             # Load in the warm start parameters
-            spliced_net.load_params(f_params=args.pretrain)
+            spliced_net.load_params(f_params=pretrain)
             spliced_net.partial_fit(sc_dual_train_dataset, y=None)
         else:
             spliced_net.fit(sc_dual_train_dataset, y=None)
 
         fig = plot_loss_history(
-            spliced_net.history, os.path.join(outdir_name, f"loss.{args.ext}")
+            spliced_net.history, os.path.join(outdir_name, f"loss.{ext}")
         )
         plt.close(fig)
 
@@ -486,7 +460,7 @@ def main():
             logscale=True,
             density_heatmap=True,
             title=f"RNA > RNA (test set), mean Pearson cor = {rna_rna_cors.mean(): .4f}",
-            fname=os.path.join(outdir_name, f"rna_rna_scatter_log.{args.ext}"),
+            fname=os.path.join(outdir_name, f"rna_rna_scatter_log.{ext}"),
         )
         plt.close(fig)
 
@@ -507,7 +481,7 @@ def main():
             sc_atac_test_dataset.data_raw.X,
             sc_atac_test_preds,
             title_prefix=f"ATAC > ATAC, mean Pearson cor = {atac_atac_cors.mean(): .4f}",
-            fname=os.path.join(outdir_name, f"atac_atac_auroc.{args.ext}"),
+            fname=os.path.join(outdir_name, f"atac_atac_auroc.{ext}"),
         )
         plt.close(fig)
 
@@ -531,7 +505,7 @@ def main():
             logscale=True,
             density_heatmap=True,
             title=f"ATAC > RNA (test set), mean Pearson cor = {atac_rna_cors.mean(): .4f}",
-            fname=os.path.join(outdir_name, f"atac_rna_scatter_log.{args.ext}"),
+            fname=os.path.join(outdir_name, f"atac_rna_scatter_log.{ext}"),
         )
         plt.close(fig)
 
@@ -552,7 +526,7 @@ def main():
             sc_atac_test_dataset.data_raw.X,
             sc_rna_atac_test_preds,
             title_prefix=f"RNA > ATAC, mean Pearson cor = {rna_atac_cors.mean(): .4f}",
-            fname=os.path.join(outdir_name, f"rna_atac_auroc.{args.ext}"),
+            fname=os.path.join(outdir_name, f"rna_atac_auroc.{ext}"),
         )
         plt.close(fig)
 
