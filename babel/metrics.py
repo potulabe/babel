@@ -1,33 +1,20 @@
 """
 Code for evaluating predicted/truth tables
 """
-import sys
-import os
+import functools
 import multiprocessing
 from typing import *
-import functools
 
 import numpy as np
 import pandas as pd
-
+import scanpy as sc
+from anndata import AnnData
 from sklearn.metrics import (
-    adjusted_mutual_info_score,
     cluster,
-    roc_curve,
-    roc_auc_score,
-    average_precision_score,
-    accuracy_score,
-    recall_score,
-    precision_score,
-    f1_score,
-    log_loss,
-    r2_score,
 )
 
-from anndata import AnnData
-
-import adata_utils
-import sc_data_loaders
+import babel.adata_utils as adata_utils
+import babel.sc_data_loaders as sc_data_loaders
 
 GENERAL_CELLTYPES_MAPPING = {
     "CD4 T cells": [
@@ -306,6 +293,25 @@ def main():
     50 0.0025152103987486907 0.005033709044165715
     100 0.00504921845713569 0.00502535557096633
     """
+
+
+def eval_correlation(predicted: sc.AnnData, true: sc.AnnData):
+    y_true_centered = true.X - true.X.mean(axis=1)
+    y_pred_centered = predicted.X - predicted.X.mean(axis=1)
+    cov_tp = np.multiply(y_true_centered, y_pred_centered)\
+                 .sum(axis=1)\
+                 .A1\
+             /(true.X.shape[1]-1)
+    var_t = np.square(y_true_centered) \
+                .sum(axis=1) \
+                .A1 \
+            /(true.X.shape[1]-1)
+    var_p = np.square(y_pred_centered) \
+                .sum(axis=1) \
+                .A1 \
+            /(true.X.shape[1]-1)
+    r = cov_tp / (var_t*var_p) ** 0.5
+    return r
 
 
 if __name__ == "__main__":

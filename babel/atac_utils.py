@@ -22,7 +22,7 @@ import intervaltree as itree
 
 import sc_data_loaders
 import genomic_interval
-import utils
+import babel.utils as utils
 
 logging.basicConfig(level=logging.INFO)
 

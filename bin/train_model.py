@@ -2,52 +2,44 @@
 Code to train a model
 """
 
-import os
-import sys
-import logging
 import argparse
 import copy
 import functools
 import itertools
-
-import numpy as np
-import pandas as pd
-import scipy.spatial
-import scanpy as sc
+import logging
+import os
 
 import matplotlib.pyplot as plt
-from skorch.helper import predefined_split
-
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
+import numpy as np
+import scanpy as sc
 import skorch
 import skorch.helper
+import torch
+import torch.nn as nn
+
+import babel.activations as activations
+import babel.adata_utils as adata_utils
+import babel.loss_functions as loss_functions
+import babel.model_utils as model_utils
+import babel.models.autoencoders as autoencoders
+import babel.plot_utils as plot_utils
+import babel.sc_data_loaders as sc_data_loaders
+import babel.utils as utils
+from babel.metrics import eval_correlation
 
 torch.backends.cudnn.deterministic = True  # For reproducibility
 torch.backends.cudnn.benchmark = False
 
-SRC_DIR = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "babel"
-)
-assert os.path.isdir(SRC_DIR)
-sys.path.append(SRC_DIR)
+# SRC_DIR = os.path.join(
+#     os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "babel"
+# )
+# assert os.path.isdir(SRC_DIR)
+# sys.path.append(SRC_DIR)
 
-MODELS_DIR = os.path.join(SRC_DIR, "models")
-assert os.path.isdir(MODELS_DIR)
-sys.path.append(MODELS_DIR)
+# MODELS_DIR = os.path.join(SRC_DIR, "models")
+# assert os.path.isdir(MODELS_DIR)
+# sys.path.append(MODELS_DIR)
 
-import sc_data_loaders
-import adata_utils
-import model_utils
-import autoencoders
-import loss_functions
-import layers
-import activations
-import plot_utils
-import utils
-import metrics
-import interpretation
 
 logging.basicConfig(level=logging.INFO)
 
@@ -62,16 +54,32 @@ def build_parser():
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
-    input_group = parser.add_mutually_exclusive_group(required=True)
-    input_group.add_argument(
-        "--data", "-d", type=str, nargs="*", help="Data files to train on",
+    # input_group = parser.add_mutually_exclusive_group(required=True)
+    # input_group.add_argument(
+    #     "--data", "-d", type=str, nargs="*", help="Data files to train on",
+    # )
+    parser.add_argument(
+        "--data-RNA", "-dr", type=str, help="RNA data files to train on", required=True
     )
-    input_group.add_argument(
+    parser.add_argument(
+        "--data-ATAC", "-da", type=str, help="ATAC data files to train on", required=True
+    )
+    parser.add_argument(
+        "--rna-normalised",
+        action="store_true",
+        help="If RNA-seq data is already normalised",
+    )
+    parser.add_argument(
+        "--atac-normalised",
+        action="store_true",
+        help="If ATAC-seq data is already normalised",
+    )
+    parser.add_argument(
         "--snareseq",
         action="store_true",
         help="Data in SNAREseq format, use custom data loading logic for separated RNA ATC files",
     )
-    input_group.add_argument(
+    parser.add_argument(
         "--shareseq",
         nargs="+",
         type=str,
@@ -92,7 +100,7 @@ def build_parser():
         "--clustermethod",
         type=str,
         choices=["leiden", "louvain"],
-        default="leiden",
+        default=None,
         help="Clustering method to determine data splits",
     )
     parser.add_argument(
@@ -227,17 +235,19 @@ def main():
         rna_data_kwargs["raw_adata"] = shareseq_rna_adata
     else:
         rna_data_kwargs = copy.copy(sc_data_loaders.TENX_PBMC_RNA_DATA_KWARGS)
-        rna_data_kwargs["fname"] = args.data
+        rna_data = utils.read_adata(args.data_RNA)
+        rna_data_kwargs["raw_adata"] = rna_data
         if args.nofilter:
             rna_data_kwargs = {
                 k: v for k, v in rna_data_kwargs.items() if not k.startswith("filt_")
             }
     rna_data_kwargs["data_split_by_cluster_log"] = not args.linear
-    rna_data_kwargs["data_split_by_cluster"] = args.clustermethod
+    rna_data_kwargs["data_split_by_cluster"] = args.clustermethod  # TODO
+    rna_data_kwargs["normalised"] = args.rna_normalised
 
     sc_rna_dataset = sc_data_loaders.SingleCellDataset(
-        valid_cluster_id=args.validcluster,
-        test_cluster_id=args.testcluster,
+        valid_cluster_id=args.validcluster,  # TODO
+        test_cluster_id=args.testcluster,  # TODO
         **rna_data_kwargs,
     )
 
@@ -289,31 +299,34 @@ def main():
             )
         atac_data_kwargs["raw_adata"] = shareseq_atac_adata
     else:
-        atac_parsed = [
-            utils.sc_read_10x_h5_ft_type(fname, "Peaks") for fname in args.data
-        ]
-        if len(atac_parsed) > 1:
-            atac_bins = sc_data_loaders.harmonize_atac_intervals(
-                atac_parsed[0].var_names, atac_parsed[1].var_names
-            )
-            for bins in atac_parsed[2:]:
-                atac_bins = sc_data_loaders.harmonize_atac_intervals(
-                    atac_bins, bins.var_names
-                )
-            logging.info(f"Aggregated {len(atac_bins)} bins")
-        else:
-            atac_bins = list(atac_parsed[0].var_names)
+        # atac_parsed = [
+        #     utils.sc_read_10x_h5_ft_type(fname, "Peaks") for fname in args.data
+        # ]
+        # if len(atac_parsed) > 1:
+        #     atac_bins = sc_data_loaders.harmonize_atac_intervals(
+        #         atac_parsed[0].var_names, atac_parsed[1].var_names
+        #     )
+        #     for bins in atac_parsed[2:]:
+        #         atac_bins = sc_data_loaders.harmonize_atac_intervals(
+        #             atac_bins, bins.var_names
+        #         )
+        #     logging.info(f"Aggregated {len(atac_bins)} bins")
+        # else:
+        #     atac_bins = list(atac_parsed[0].var_names)
+        atac_data = utils.read_adata(args.data_ATAC)
 
         atac_data_kwargs = copy.copy(sc_data_loaders.TENX_PBMC_ATAC_DATA_KWARGS)
-        atac_data_kwargs["fname"] = rna_data_kwargs["fname"]
+        # atac_data_kwargs["fname"] = rna_data_kwargs["fname"]
+        atac_data_kwargs["raw_adata"] = atac_data
         atac_data_kwargs["pool_genomic_interval"] = 0  # Do not pool
-        atac_data_kwargs["reader"] = functools.partial(
-            utils.sc_read_multi_files,
-            reader=lambda x: sc_data_loaders.repool_atac_bins(
-                utils.sc_read_10x_h5_ft_type(x, "Peaks"), atac_bins,
-            ),
-        )
+        # atac_data_kwargs["reader"] = functools.partial(
+        #     utils.sc_read_multi_files,
+        #     reader=lambda x: sc_data_loaders.repool_atac_bins(
+        #         utils.sc_read_10x_h5_ft_type(x, "Peaks"), atac_bins,
+        #     ),
+        # )
     atac_data_kwargs["cluster_res"] = 0  # Do not bother clustering ATAC data
+    atac_data_kwargs["normalised"] = args.atac_normalised
 
     sc_atac_dataset = sc_data_loaders.SingleCellDataset(
         predefined_split=sc_rna_dataset, **atac_data_kwargs
@@ -366,35 +379,35 @@ def main():
 
         # Write dataset
         ### Full
-        sc_rna_dataset.size_norm_counts.write_h5ad(
-            os.path.join(outdir_name, "full_rna.h5ad")
-        )
-        sc_rna_dataset.size_norm_log_counts.write_h5ad(
-            os.path.join(outdir_name, "full_rna_log.h5ad")
-        )
-        sc_atac_dataset.data_raw.write_h5ad(os.path.join(outdir_name, "full_atac.h5ad"))
-        ### Train
-        sc_rna_train_dataset.size_norm_counts.write_h5ad(
-            os.path.join(outdir_name, "train_rna.h5ad")
-        )
-        sc_atac_train_dataset.data_raw.write_h5ad(
-            os.path.join(outdir_name, "train_atac.h5ad")
-        )
-        ### Valid
-        sc_rna_valid_dataset.size_norm_counts.write_h5ad(
-            os.path.join(outdir_name, "valid_rna.h5ad")
-        )
-        sc_atac_valid_dataset.data_raw.write_h5ad(
-            os.path.join(outdir_name, "valid_atac.h5ad")
-        )
-        ### Test
-        sc_rna_test_dataset.size_norm_counts.write_h5ad(
-            os.path.join(outdir_name, "truth_rna.h5ad")
-        )
-        sc_atac_dataset.data_raw.write_h5ad(os.path.join(outdir_name, "full_atac.h5ad"))
-        sc_atac_test_dataset.data_raw.write_h5ad(
-            os.path.join(outdir_name, "truth_atac.h5ad")
-        )
+        # sc_rna_dataset.size_norm_counts.write_h5ad(
+        #     os.path.join(outdir_name, "full_rna.h5ad")
+        # )
+        # sc_rna_dataset.size_norm_log_counts.write_h5ad(
+        #     os.path.join(outdir_name, "full_rna_log.h5ad")
+        # )
+        # sc_atac_dataset.data_raw.write_h5ad(os.path.join(outdir_name, "full_atac.h5ad"))
+        # ### Train
+        # sc_rna_train_dataset.size_norm_counts.write_h5ad(
+        #     os.path.join(outdir_name, "train_rna.h5ad")
+        # )
+        # sc_atac_train_dataset.data_raw.write_h5ad(
+        #     os.path.join(outdir_name, "train_atac.h5ad")
+        # )
+        # ### Valid
+        # sc_rna_valid_dataset.size_norm_counts.write_h5ad(
+        #     os.path.join(outdir_name, "valid_rna.h5ad")
+        # )
+        # sc_atac_valid_dataset.data_raw.write_h5ad(
+        #     os.path.join(outdir_name, "valid_atac.h5ad")
+        # )
+        # ### Test
+        # sc_rna_test_dataset.size_norm_counts.write_h5ad(
+        #     os.path.join(outdir_name, "truth_rna.h5ad")
+        # )
+        # sc_atac_dataset.data_raw.write_h5ad(os.path.join(outdir_name, "full_atac.h5ad"))
+        # sc_atac_test_dataset.data_raw.write_h5ad(
+        #     os.path.join(outdir_name, "truth_atac.h5ad")
+        # )
 
         # Instantiate and train model
         model_class = (
@@ -459,16 +472,20 @@ def main():
             var=sc_rna_test_dataset.data_raw.var,
             obs=sc_rna_test_dataset.data_raw.obs,
         )
+        rna_rna_cors = eval_correlation(
+                sc_rna_test_preds_anndata, sc_rna_test_dataset.data_raw
+        )
+
         sc_rna_test_preds_anndata.write_h5ad(
             os.path.join(outdir_name, "rna_rna_test_preds.h5ad")
         )
         fig = plot_utils.plot_scatter_with_r(
-            sc_rna_test_dataset.size_norm_counts.X,
+            sc_rna_test_dataset.data_raw.X,
             sc_rna_test_preds,
             one_to_one=True,
             logscale=True,
             density_heatmap=True,
-            title="RNA > RNA (test set)",
+            title=f"RNA > RNA (test set), mean Pearson cor = {rna_rna_cors.mean(): .4f}",
             fname=os.path.join(outdir_name, f"rna_rna_scatter_log.{args.ext}"),
         )
         plt.close(fig)
@@ -480,13 +497,16 @@ def main():
             var=sc_atac_test_dataset.data_raw.var,
             obs=sc_atac_test_dataset.data_raw.obs,
         )
+        atac_atac_cors = eval_correlation(
+                sc_atac_test_preds_anndata, sc_atac_test_dataset.data_raw
+        )
         sc_atac_test_preds_anndata.write_h5ad(
             os.path.join(outdir_name, "atac_atac_test_preds.h5ad")
         )
         fig = plot_utils.plot_auroc(
             sc_atac_test_dataset.data_raw.X,
             sc_atac_test_preds,
-            title_prefix="ATAC > ATAC",
+            title_prefix=f"ATAC > ATAC, mean Pearson cor = {atac_atac_cors.mean(): .4f}",
             fname=os.path.join(outdir_name, f"atac_atac_auroc.{args.ext}"),
         )
         plt.close(fig)
@@ -498,16 +518,19 @@ def main():
             var=sc_rna_test_dataset.data_raw.var,
             obs=sc_rna_test_dataset.data_raw.obs,
         )
+        atac_rna_cors = eval_correlation(
+                sc_atac_rna_test_preds_anndata, sc_rna_test_dataset.data_raw
+        )
         sc_atac_rna_test_preds_anndata.write_h5ad(
             os.path.join(outdir_name, "atac_rna_test_preds.h5ad")
         )
         fig = plot_utils.plot_scatter_with_r(
-            sc_rna_test_dataset.size_norm_counts.X,
+            sc_rna_test_dataset.data_raw.X,
             sc_atac_rna_test_preds,
             one_to_one=True,
             logscale=True,
             density_heatmap=True,
-            title="ATAC > RNA (test set)",
+            title=f"ATAC > RNA (test set), mean Pearson cor = {atac_rna_cors.mean(): .4f}",
             fname=os.path.join(outdir_name, f"atac_rna_scatter_log.{args.ext}"),
         )
         plt.close(fig)
@@ -519,13 +542,16 @@ def main():
             var=sc_atac_test_dataset.data_raw.var,
             obs=sc_atac_test_dataset.data_raw.obs,
         )
+        rna_atac_cors = eval_correlation(
+                sc_rna_atac_test_preds_anndata, sc_atac_test_dataset.data_raw
+        )
         sc_rna_atac_test_preds_anndata.write_h5ad(
             os.path.join(outdir_name, "rna_atac_test_preds.h5ad")
         )
         fig = plot_utils.plot_auroc(
             sc_atac_test_dataset.data_raw.X,
             sc_rna_atac_test_preds,
-            title_prefix="RNA > ATAC",
+            title_prefix=f"RNA > ATAC, mean Pearson cor = {rna_atac_cors.mean(): .4f}",
             fname=os.path.join(outdir_name, f"rna_atac_auroc.{args.ext}"),
         )
         plt.close(fig)

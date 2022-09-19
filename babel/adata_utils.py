@@ -27,8 +27,8 @@ from scipy import io
 import anndata as ad
 from anndata import AnnData
 
-from genomic_interval import GenomicInterval
-import utils
+from babel.genomic_interval import GenomicInterval
+import babel.utils as utils
 
 logging.basicConfig(level=logging.INFO)
 
@@ -63,7 +63,7 @@ def write_adata_as_10x_dir(
             sink.write(n + "\n")
 
 
-def annotate_basic_adata_metrics(adata: AnnData) -> None:
+def annotate_basic_adata_metrics(adata: AnnData, normalised: bool) -> None:
     """Annotate with some basic metrics"""
     assert isinstance(adata, AnnData)
     adata.obs["n_counts"] = np.squeeze(np.asarray((adata.X.sum(1))))

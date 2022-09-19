@@ -14,7 +14,7 @@ from scipy import sparse
 import anndata as ad
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-import utils
+import babel.utils as utils
 
 
 class KNNRegressor(object):

@@ -5,26 +5,24 @@ Autoencoder etiquette:
 - The LAST output should always be the encoded bottleneck layer (with the exception of DCA)
 """
 
+import functools
+import logging
 import os
 import sys
-import logging
 from typing import List, Tuple, Union, Callable
-import functools
 
 import numpy as np
-from scipy import sparse
-
+import skorch
+import skorch.utils
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from scipy import sparse
 
-import skorch
-import skorch.utils
+import babel.activations as activations
+import babel.model_utils as model_utils
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-import activations
-import model_utils
+# sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
 torch.backends.cudnn.deterministic = True  # For reproducibility
@@ -1376,8 +1374,8 @@ class PairedAutoEncoderSkorchNet(skorch.NeuralNet):
         dataset = self.get_dataset(X)
         iterator = self.get_iterator(dataset, training=training)
         for data in iterator:
-            Xi = skorch.dataset.unpack_data(data)[0]
-            yp = self.evaluation_step(Xi, training=training)
+            # Xi = skorch.dataset.unpack_data(data)[0]
+            yp = self.evaluation_step(data, training=training)
             if isinstance(yp, tuple):
                 yield model_utils.recursive_to_device(yp)  # <- modification here
             else:

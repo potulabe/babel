@@ -29,9 +29,9 @@ sys.path.append(SRC_DIR)
 import sc_data_loaders
 import loss_functions
 import model_utils
-import plot_utils
-import adata_utils
-import utils
+import babel.plot_utils as plot_utils
+import babel.adata_utils as adata_utils
+import babel.utils as utils
 from models import autoencoders
 
 DATA_DIR = os.path.join(os.path.dirname(SRC_DIR), "data")

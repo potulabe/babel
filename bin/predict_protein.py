@@ -27,7 +27,7 @@ import autoencoders
 import loss_functions
 import model_utils
 import protein_utils
-import utils
+import babel.utils as utils
 
 from predict_model import (
     load_atac_files_for_eval,

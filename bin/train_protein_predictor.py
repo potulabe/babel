@@ -44,7 +44,7 @@ import autoencoders
 import loss_functions
 import model_utils
 from protein_utils import LOSS_DICT, OPTIM_DICT, ACT_DICT
-import utils
+import babel.utils as utils
 
 from train_model import plot_loss_history
 

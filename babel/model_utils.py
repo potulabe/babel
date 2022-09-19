@@ -2,41 +2,29 @@
 Utility functions for working with models, including some callbacks
 """
 
-import os
-import sys
-import logging
-import argparse
-import warnings
-import inspect
-import itertools
-import copy
 import collections
-
+import itertools
+import logging
+import os
+import warnings
 from typing import *
 
-import numpy as np
-
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-from torch.utils.tensorboard import SummaryWriter
-import skorch
-
-import tqdm
 import gdown
+import numpy as np
+import skorch
+import torch
 
-MODELS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "models")
-assert os.path.isdir(MODELS_DIR)
-sys.path.append(MODELS_DIR)
-import loss_functions
-import metrics
-import utils
-import autoencoders
+# MODELS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "models")
+# assert os.path.isdir(MODELS_DIR)
+# sys.path.append(MODELS_DIR)
+import babel.loss_functions as loss_functions
+import babel.models.autoencoders as autoencoders
+import babel.utils as utils
 
 DATA_LOADER_PARAMS = {
     "batch_size": 64,
     "shuffle": True,
-    "num_workers": 6,
+    "num_workers": 1,
 }
 
 OPTIMIZER_PARAMS = {

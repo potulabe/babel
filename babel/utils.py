@@ -4,25 +4,23 @@ Utility functions
 Some functions live here because otherwise managing their import
 in other places would be overly difficult
 """
-import os
-import sys
-import functools
-import logging
-from typing import *
-import itertools
 import collections
+import functools
 import gzip
+import itertools
+import logging
+import os
+from typing import *
 
+import anndata as ad
+import intervaltree as itree
 import numpy as np
 import pandas as pd
-import scipy
 import scanpy as sc
-from anndata import AnnData
-
-import torch
-
-import intervaltree as itree
+import scipy
 import sortedcontainers
+import torch
+from anndata import AnnData
 
 DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
 assert os.path.isdir(DATA_DIR)
@@ -174,6 +172,10 @@ def sc_read_10x_h5_ft_type(fname: str, ft_type: str) -> AnnData:
     return retval
 
 
+def read_adata(fname: str) -> AnnData:
+    return sc.read_h5ad(fname)
+
+
 def extract_file(fname, overwrite: bool = False) -> str:
     """Extracts the file and return the path to extracted file"""
     out_fname = os.path.abspath(fname.replace(".gz", ""))
@@ -250,7 +252,7 @@ def read_gtf_gene_to_pos(
                             raise NotImplementedError
                 if tripped_attr_filter:
                     continue
-            gene = attr_dict["gene_name"].strip('"')
+            gene = attr_dict["gene_id"].strip('"')
             start = int(start)
             end = int(end)
             assert (

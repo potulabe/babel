@@ -16,7 +16,7 @@ SRC_DIR = os.path.join(
 )
 assert os.path.isdir(SRC_DIR)
 sys.path.append(SRC_DIR)
-import adata_utils
+import babel.adata_utils as adata_utils
 import metrics
 
 logging.basicConfig(level=logging.INFO)

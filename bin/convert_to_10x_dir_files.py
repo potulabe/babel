@@ -2,26 +2,21 @@
 Convert input file to 10x data dir
 """
 
-import os
-import sys
 import argparse
 import logging
+import os
 
-import numpy as np
-import pandas as pd
-from scipy import io
-import scanpy as sc
 import anndata as ad
+import scanpy as sc
 
-SRC_DIR = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "babel"
-)
-assert os.path.isdir(SRC_DIR)
-sys.path.append(SRC_DIR)
-from genomic_interval import GenomicInterval as GI
-import adata_utils
-import utils
+import babel.adata_utils as adata_utils
+import babel.utils as utils
 
+# SRC_DIR = os.path.join(
+#     os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "babel"
+# )
+# assert os.path.isdir(SRC_DIR)
+# sys.path.append(SRC_DIR)
 logging.basicConfig(level=logging.INFO)
 
 

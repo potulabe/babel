@@ -14,9 +14,9 @@ SRC_DIR = os.path.join(
 assert os.path.isdir(SRC_DIR)
 sys.path.append(SRC_DIR)
 import interpretation
-import adata_utils
-import plot_utils
-import utils
+import babel.adata_utils as adata_utils
+import babel.plot_utils as plot_utils
+import babel.utils as utils
 
 from evaluate_bulk_rna_concordance import load_file_flex_format
 

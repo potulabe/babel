@@ -41,9 +41,11 @@ from torch.utils.data import Dataset
 
 import sortedcontainers
 
-import adata_utils
-import plot_utils
-import utils
+import babel.adata_utils as adata_utils
+import babel.plot_utils as plot_utils
+import babel.utils as utils
+
+chr_coords_re = r'([^:]+):(\d+)-(\d+)'
 
 DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
 assert os.path.isdir(DATA_DIR)
@@ -58,100 +60,100 @@ assert os.path.isfile(HG38_GTF)
 HG19_GTF = os.path.join(DATA_DIR, "Homo_sapiens.GRCh37.87.gtf.gz")
 assert os.path.isfile(HG19_GTF)
 
-SNARESEQ_ATAC_CELL_INFO = pd.read_csv(
-    os.path.join(
-        SNARESEQ_DATA_DIR, "GSE126074_AdBrainCortex_SNAREseq_chromatin.barcodes.tsv.gz"
-    ),
-    sep="\t",
-    header=None,
-    index_col=0,
-)
-SNARESEQ_ATAC_CELL_INFO.index.name = "barcodes"
+# SNARESEQ_ATAC_CELL_INFO = pd.read_csv(
+#     os.path.join(
+#         SNARESEQ_DATA_DIR, "GSE126074_AdBrainCortex_SNAREseq_chromatin.barcodes.tsv.gz"
+#     ),
+#     sep="\t",
+#     header=None,
+#     index_col=0,
+# )
+# SNARESEQ_ATAC_CELL_INFO.index.name = "barcodes"
 
-SNARESEQ_ATAC_PEAK_INFO = pd.read_csv(
-    os.path.join(
-        SNARESEQ_DATA_DIR, "GSE126074_AdBrainCortex_SNAREseq_chromatin.peaks.tsv.gz"
-    ),
-    sep="\t",
-    header=None,
-    index_col=0,
-)
-SNARESEQ_ATAC_PEAK_INFO.index.name = "peaks"
-
-SNARESEQ_ATAC_DATA_KWARGS = {
-    "fname": os.path.join(
-        SNARESEQ_DATA_DIR, "GSE126074_AdBrainCortex_SNAREseq_chromatin.counts.mtx.gz"
-    ),
-    "cell_info": SNARESEQ_ATAC_CELL_INFO,
-    "gene_info": SNARESEQ_ATAC_PEAK_INFO,
-    "transpose": True,
-    "selfsupervise": True,  # Doesn't actually do anything
-    "binarize": True,  # From SNAREseq paper methods section (SCALE also binarizes, uses either CE or MSE loss)
-    "autosomes_only": True,
-    "split_by_chrom": True,
-    "concat_outputs": True,
-    "filt_gene_min_counts": 5,  # From SNAREseq paper methods section: "peaks with fewer than five counts overall"
-    "filt_gene_min_cells": 5,  # From SCALE - choose to keep peaks seek in >= 5 cells
-    "filt_gene_max_cells": 0.1,  # From SNAREseq paper methods section: filter peaks expressing in more than 10% of cells
-    "pool_genomic_interval": 0,  # Smaller bin size because we can handle it
-    "normalize": False,  # True,
-    "log_trans": False,  # True,
-    "y_mode": "x",
-    "calc_size_factors": False,  # True,
-    "return_sf": False,
-}
-
-SNARESEQ_RNA_CELL_INFO = pd.read_csv(
-    os.path.join(
-        SNARESEQ_DATA_DIR, "GSE126074_AdBrainCortex_SNAREseq_cDNA.barcodes.tsv.gz"
-    ),
-    sep="\t",
-    header=None,
-    index_col=0,
-)
-SNARESEQ_RNA_CELL_INFO.index.name = "barcodes"
-
-SNARESEQ_RNA_GENE_INFO = pd.read_csv(
-    os.path.join(
-        SNARESEQ_DATA_DIR, "GSE126074_AdBrainCortex_SNAREseq_cDNA.genes.tsv.gz"
-    ),
-    sep="\t",
-    header=None,
-    index_col=0,
-)
-SNARESEQ_RNA_GENE_INFO.index.name = "gene"
-
-SNARESEQ_RNA_DATA_KWARGS = {
-    "fname": os.path.join(
-        SNARESEQ_DATA_DIR, "GSE126074_AdBrainCortex_SNAREseq_cDNA.counts.mtx.gz"
-    ),
-    "cell_info": SNARESEQ_RNA_CELL_INFO,
-    "gene_info": SNARESEQ_RNA_GENE_INFO,
-    "transpose": True,
-    "selfsupervise": True,
-    "binarize": False,
-    "gtf_file": MM10_GTF,
-    "autosomes_only": True,
-    "sort_by_pos": True,
-    "split_by_chrom": True,
-    "concat_outputs": True,
-    "binarize": False,
-    "filt_cell_min_genes": 200,  # SNAREseq paper: minimum of 200 genes
-    "filt_cell_max_genes": 2500,  # SNAREseq paper: maximum of 2500 genes
-    "normalize": True,
-    "log_trans": True,
-    "clip": 0.5,  # Clip the bottom and top 0.5%
-    "y_mode": "size_norm",
-    "calc_size_factors": True,
-    "return_sf": False,
-    "cluster_res": 1.5,
-}
+# SNARESEQ_ATAC_PEAK_INFO = pd.read_csv(
+#     os.path.join(
+#         SNARESEQ_DATA_DIR, "GSE126074_AdBrainCortex_SNAREseq_chromatin.peaks.tsv.gz"
+#     ),
+#     sep="\t",
+#     header=None,
+#     index_col=0,
+# )
+# SNARESEQ_ATAC_PEAK_INFO.index.name = "peaks"
+#
+# SNARESEQ_ATAC_DATA_KWARGS = {
+#     "fname": os.path.join(
+#         SNARESEQ_DATA_DIR, "GSE126074_AdBrainCortex_SNAREseq_chromatin.counts.mtx.gz"
+#     ),
+#     "cell_info": SNARESEQ_ATAC_CELL_INFO,
+#     "gene_info": SNARESEQ_ATAC_PEAK_INFO,
+#     "transpose": True,
+#     "selfsupervise": True,  # Doesn't actually do anything
+#     "binarize": True,  # From SNAREseq paper methods section (SCALE also binarizes, uses either CE or MSE loss)
+#     "autosomes_only": True,
+#     "split_by_chrom": True,
+#     "concat_outputs": True,
+#     "filt_gene_min_counts": 5,  # From SNAREseq paper methods section: "peaks with fewer than five counts overall"
+#     "filt_gene_min_cells": 5,  # From SCALE - choose to keep peaks seek in >= 5 cells
+#     "filt_gene_max_cells": 0.1,  # From SNAREseq paper methods section: filter peaks expressing in more than 10% of cells
+#     "pool_genomic_interval": 0,  # Smaller bin size because we can handle it
+#     "normalize": False,  # True,
+#     "log_trans": False,  # True,
+#     "y_mode": "x",
+#     "calc_size_factors": False,  # True,
+#     "return_sf": False,
+# }
+#
+# SNARESEQ_RNA_CELL_INFO = pd.read_csv(
+#     os.path.join(
+#         SNARESEQ_DATA_DIR, "GSE126074_AdBrainCortex_SNAREseq_cDNA.barcodes.tsv.gz"
+#     ),
+#     sep="\t",
+#     header=None,
+#     index_col=0,
+# )
+# SNARESEQ_RNA_CELL_INFO.index.name = "barcodes"
+#
+# SNARESEQ_RNA_GENE_INFO = pd.read_csv(
+#     os.path.join(
+#         SNARESEQ_DATA_DIR, "GSE126074_AdBrainCortex_SNAREseq_cDNA.genes.tsv.gz"
+#     ),
+#     sep="\t",
+#     header=None,
+#     index_col=0,
+# )
+# SNARESEQ_RNA_GENE_INFO.index.name = "gene"
+#
+# SNARESEQ_RNA_DATA_KWARGS = {
+#     "fname": os.path.join(
+#         SNARESEQ_DATA_DIR, "GSE126074_AdBrainCortex_SNAREseq_cDNA.counts.mtx.gz"
+#     ),
+#     "cell_info": SNARESEQ_RNA_CELL_INFO,
+#     "gene_info": SNARESEQ_RNA_GENE_INFO,
+#     "transpose": True,
+#     "selfsupervise": True,
+#     "binarize": False,
+#     "gtf_file": MM10_GTF,
+#     "autosomes_only": True,
+#     "sort_by_pos": True,
+#     "split_by_chrom": True,
+#     "concat_outputs": True,
+#     "filt_cell_min_genes": 200,  # SNAREseq paper: minimum of 200 genes
+#     "filt_cell_max_genes": 2500,  # SNAREseq paper: maximum of 2500 genes
+#     "normalize": True,
+#     "log_trans": True,
+#     "clip": 0.5,  # Clip the bottom and top 0.5%
+#     "y_mode": "size_norm",
+#     "calc_size_factors": True,
+#     "return_sf": False,
+#     "cluster_res": 1.5,
+# }
 
 TENX_PBMC_ATAC_DATA_KWARGS = {
     "transpose": False,
     "selfsupervise": True,  # Doesn't actually do anything
     "binarize": True,  # From SNAREseq paper methods section (SCALE also binarizes, uses either CE or MSE loss)
     "autosomes_only": True,
+    "gtf_file": HG38_GTF,
     "split_by_chrom": True,
     "concat_outputs": True,
     "filt_gene_min_counts": 5,  # From SNAREseq paper methods section: "peaks with fewer than five counts overall"
@@ -173,18 +175,18 @@ TENX_PBMC_RNA_DATA_KWARGS = {
     "transpose": False,  # We do not transpose because the h5 is already cell x gene
     "gtf_file": HG38_GTF,
     "autosomes_only": True,
-    "sort_by_pos": True,
+    "sort_by_pos": False,  # True, TODO
     "split_by_chrom": True,
     "concat_outputs": True,
     "selfsupervise": True,
     "binarize": False,
     "filt_cell_min_genes": 200,  # SNAREseq paper: minimum of 200 genes
     "filt_cell_max_genes": 7000,  # SNAREseq paper: maximum of 2500 genes
-    "normalize": True,
-    "log_trans": True,
-    "clip": 0.5,  # Clip the bottom and top 0.5%
-    "y_mode": "size_norm",  # The output that we learn to predict
-    "calc_size_factors": True,
+    "normalize": False,  # True,
+    "log_trans": False,  # True,
+    "clip": 0,  # 0.5,  # Clip the bottom and top 0.5%
+    "y_mode": "raw_count",  # The output that we learn to predict
+    "calc_size_factors": False,  # True,
     "return_sf": False,
     "cluster_res": 1.5,
 }
@@ -206,7 +208,7 @@ class SingleCellDataset(Dataset):
 
     def __init__(
         self,
-        fname: Union[str, List[str]],
+        fname: Union[str, List[str]] = None,
         reader: Callable = sc_read_mtx,
         raw_adata: Union[AnnData, None] = None,  # Should be raw data
         transpose: bool = True,
@@ -249,6 +251,7 @@ class SingleCellDataset(Dataset):
         gtf_file: str = MM10_GTF,  # GTF file mapping genes to chromosomes, unused for ATAC
         cluster_res: float = 2.0,
         cache_prefix: str = "",
+        normalised: bool = False
     ):
         """
         Clipping is performed AFTER normalization
@@ -267,7 +270,7 @@ class SingleCellDataset(Dataset):
             "x",
         ], f"Unrecognized mode for y output: {y_mode}"
         if y_mode == "size_norm":
-            assert calc_size_factors
+            assert calc_size_factors or normalised
         self.mode = mode
         self.selfsupervise = selfsupervise
         self.x_dropout = x_dropout
@@ -371,7 +374,7 @@ class SingleCellDataset(Dataset):
             # self.data_raw.raw = self.data_raw.copy()  # Store original counts
             self.data_raw.X[self.data_raw.X.nonzero()] = 1  # .X here is a csr matrix
 
-        adata_utils.annotate_basic_adata_metrics(self.data_raw)
+        adata_utils.annotate_basic_adata_metrics(self.data_raw, normalised)
         adata_utils.filter_adata_cells_and_genes(
             self.data_raw,
             filter_cell_min_counts=filt_cell_min_counts,
@@ -383,6 +386,9 @@ class SingleCellDataset(Dataset):
             filter_gene_min_cells=filt_gene_min_cells,
             filter_gene_max_cells=filt_gene_max_cells,
         )
+
+        self.data_raw.raw = self.data_raw.copy()
+
         self.data_raw = adata_utils.normalize_count_table(  # Normalizes in place
             self.data_raw,
             size_factors=calc_size_factors,
@@ -483,7 +489,7 @@ class SingleCellDataset(Dataset):
         # gtf_file can be empty if we're using atac intervals
         feature_chroms = (
             get_chrom_from_intervals(self.data_raw.var_names)
-            if list(self.data_raw.var_names)[0].startswith("chr")
+            if re.match(chr_coords_re, list(self.data_raw.var_names)[0])
             else get_chrom_from_genes(self.data_raw.var_names, gtf_file)
         )
         self.data_raw.var["chrom"] = feature_chroms
@@ -551,9 +557,9 @@ class SingleCellDataset(Dataset):
         (train_idx, valid_idx, test_idx,) = shuffle_indices_train_valid_test(
             indices, shuffle=True, seed=1234, valid=0.15, test=0.15
         )
-        assert train_idx, "Got empty training split"
-        assert valid_idx, "Got empty validation split"
-        assert test_idx, "Got empty test split"
+        assert train_idx.any(), "Got empty training split"
+        assert valid_idx.any(), "Got empty validation split"
+        assert test_idx.any(), "Got empty test split"
         data_split_idx = {}
         data_split_idx["train"] = train_idx
         data_split_idx["valid"] = valid_idx
@@ -692,8 +698,9 @@ class SingleCellDataset(Dataset):
             else i  # If not sampling y and training, return the same idx
         )
         if self.y_mode.endswith("raw_count"):
+            idx_name = self.data_raw.raw.obs_names[y_idx]
             target = torch.from_numpy(
-                utils.ensure_arr(self.data_raw.raw.var_vector(y_idx))
+                utils.ensure_arr(self.data_raw.raw.var_vector(idx_name))
             ).type(torch.FloatTensor)
         elif self.y_mode.endswith("size_norm"):
             target = torch.from_numpy(self.size_norm_counts.var_vector(y_idx)).type(
@@ -1354,7 +1361,7 @@ def reorder_genes_by_pos(
     genes_list = list(genes)
     assert len(genes_set) == len(genes), f"Got duplicates in genes"
 
-    genes_to_pos = utils.read_gtf_gene_to_pos(gtf_file)
+    genes_to_pos = utils.read_gtf_gene_to_pos(gtf_file)  # TODO: cache it!
     genes_intersection = [
         g for g in genes_to_pos if g in genes_set
     ]  # In order of position
@@ -1399,9 +1406,9 @@ def get_chrom_from_intervals(intervals: List[str], strip_chr: bool = True):
     >>> get_chrom_from_intervals(['chr2:100-200', 'chr3:100-222'])
     ['2', '3']
     """
-    retval = [interval.split(":")[0].strip() for interval in intervals]
-    if strip_chr:
-        retval = [chrom.strip("chr") for chrom in retval]
+    retval = [re.match(chr_coords_re, interval).groups()[0] for interval in intervals]
+    # if strip_chr:
+    #     retval = [chrom.strip("chr") for chrom in retval]
     return retval
 
 
