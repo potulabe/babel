@@ -433,6 +433,7 @@ def get_device(i: int = None) -> str:
         torch.cuda.set_device(d)
     else:
         d = torch.device("cpu")
+    logging.info("Device: " + d)
     return d
 
 

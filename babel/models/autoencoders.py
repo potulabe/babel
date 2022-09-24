@@ -1144,7 +1144,7 @@ class NaiveSplicedAutoEncoder(SplicedAutoEncoder):
 
 class AssymSplicedAutoEncoder(SplicedAutoEncoder):
     """
-    Assymmetric spliced autoencoder where branch 2 is a chrom AE
+    Asymmetric spliced autoencoder where branch 2 is a chrom AE
     """
 
     def __init__(
