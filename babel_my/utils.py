@@ -423,7 +423,7 @@ def isnotebook() -> bool:
         return False  # Probably standard Python interpreter
 
 
-def get_device(i: int = None) -> str:
+def get_device(i: int = None) -> torch.device:
     """Returns the i-th GPU if GPU is available, else CPU"""
     if torch.cuda.is_available() and isinstance(i, int):
         devices = list(range(torch.cuda.device_count()))
@@ -433,7 +433,7 @@ def get_device(i: int = None) -> str:
         torch.cuda.set_device(d)
     else:
         d = torch.device("cpu")
-    logging.info("Device: " + d)
+    logging.info("Device: " + str(d))
     return d
 
 
