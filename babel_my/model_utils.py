@@ -17,9 +17,9 @@ import torch
 # MODELS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "models")
 # assert os.path.isdir(MODELS_DIR)
 # sys.path.append(MODELS_DIR)
-import babel.loss_functions as loss_functions
-import babel.models.autoencoders as autoencoders
-import babel.utils as utils
+import babel_my.loss_functions as loss_functions
+import babel_my.models.autoencoders as autoencoders
+import babel_my.utils as utils
 
 DATA_LOADER_PARAMS = {
     "batch_size": 64,

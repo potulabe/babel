@@ -27,8 +27,8 @@ from scipy import io
 import anndata as ad
 from anndata import AnnData
 
-from babel.genomic_interval import GenomicInterval
-import babel.utils as utils
+from babel_my.genomic_interval import GenomicInterval
+import babel_my.utils as utils
 
 logging.basicConfig(level=logging.INFO)
 

@@ -20,8 +20,8 @@ SRC_DIR = os.path.join(
 )
 assert os.path.isdir(SRC_DIR)
 sys.path.append(SRC_DIR)
-import babel.plot_utils as plot_utils
-import babel.utils as utils
+import babel_my.plot_utils as plot_utils
+import babel_my.utils as utils
 
 
 logging.basicConfig(level=logging.INFO)

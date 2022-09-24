@@ -37,8 +37,8 @@ except ModuleNotFoundError:
 from anndata import AnnData
 import scanpy as sc
 
-import babel.adata_utils as adata_utils
-import babel.utils as utils
+import babel_my.adata_utils as adata_utils
+import babel_my.utils as utils
 
 SRC_DIR = os.path.dirname(os.path.abspath(__file__))
 assert os.path.isdir(SRC_DIR)

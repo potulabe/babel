@@ -19,8 +19,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 from scipy import sparse
 
-import babel.activations as activations
-import babel.model_utils as model_utils
+import babel_my.activations as activations
+import babel_my.model_utils as model_utils
 
 # sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 

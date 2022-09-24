@@ -12,7 +12,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.tensorboard import SummaryWriter
 
-from babel.models import layers
+from babel_my.models import layers
 
 
 class BCELoss(nn.BCELoss):

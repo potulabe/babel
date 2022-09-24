@@ -13,8 +13,8 @@ from sklearn.metrics import (
     cluster,
 )
 
-import babel.adata_utils as adata_utils
-import babel.sc_data_loaders as sc_data_loaders
+import babel_my.adata_utils as adata_utils
+import babel_my.sc_data_loaders as sc_data_loaders
 
 GENERAL_CELLTYPES_MAPPING = {
     "CD4 T cells": [

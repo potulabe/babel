@@ -16,14 +16,14 @@ import skorch.helper
 import torch
 import torch.nn as nn
 
-import babel.activations as activations
-import babel.loss_functions as loss_functions
-import babel.model_utils as model_utils
-import babel.models.autoencoders as autoencoders
-import babel.plot_utils as plot_utils
-import babel.sc_data_loaders as sc_data_loaders
-import babel.utils as utils
-from babel.metrics import eval_correlation
+import babel_my.activations as activations
+import babel_my.loss_functions as loss_functions
+import babel_my.model_utils as model_utils
+import babel_my.models.autoencoders as autoencoders
+import babel_my.plot_utils as plot_utils
+import babel_my.sc_data_loaders as sc_data_loaders
+import babel_my.utils as utils
+from babel_my.metrics import eval_correlation
 
 torch.backends.cudnn.deterministic = True  # For reproducibility
 torch.backends.cudnn.benchmark = False

@@ -41,9 +41,9 @@ from torch.utils.data import Dataset
 
 import sortedcontainers
 
-import babel.adata_utils as adata_utils
-import babel.plot_utils as plot_utils
-import babel.utils as utils
+import babel_my.adata_utils as adata_utils
+import babel_my.plot_utils as plot_utils
+import babel_my.utils as utils
 
 chr_coords_re = r'([^:]+):(\d+)-(\d+)'
 

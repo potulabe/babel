@@ -10,7 +10,7 @@ import skorch
 
 import loss_functions
 import model_utils
-import babel.utils as utils
+import babel_my.utils as utils
 
 MODELS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "models")
 assert os.path.isdir(MODELS_DIR)

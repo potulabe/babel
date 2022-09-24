@@ -9,8 +9,8 @@ import os
 import anndata as ad
 import scanpy as sc
 
-import babel.adata_utils as adata_utils
-import babel.utils as utils
+import babel_my.adata_utils as adata_utils
+import babel_my.utils as utils
 
 # SRC_DIR = os.path.join(
 #     os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "babel"
