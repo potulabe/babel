@@ -25,9 +25,9 @@ from anndata import AnnData
 DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
 assert os.path.isdir(DATA_DIR)
 HG38_GTF = os.path.join(DATA_DIR, "Homo_sapiens.GRCh38.100.gtf.gz")
-assert os.path.isfile(HG38_GTF)
+# assert os.path.isfile(HG38_GTF)
 HG19_GTF = os.path.join(DATA_DIR, "Homo_sapiens.GRCh37.87.gtf.gz")
-assert os.path.isfile(HG19_GTF)
+# assert os.path.isfile(HG19_GTF)
 
 
 def ensure_arr(x) -> np.ndarray:
