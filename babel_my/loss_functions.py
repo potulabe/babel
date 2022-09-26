@@ -174,14 +174,14 @@ class NegativeBinomialLoss(nn.Module):
         )
         self.l1_lambda = l1_lambda
 
-    def forward(self, preds, target):
-        preds, theta = preds[:2]
+    def forward(self, outp, target):
+        preds, theta = outp[:2]
         l = self.loss(
             preds=preds,
             theta=theta,
             truth=target,
         )
-        encoded = preds[:-1]
+        encoded = outp[-1]
         l += self.l1_lambda * torch.abs(encoded).sum()
         return l
 
@@ -213,15 +213,15 @@ class ZeroInflatedNegativeBinomialLoss(nn.Module):
         )
         self.l1_lambda = l1_lambda
 
-    def forward(self, preds, target):
-        preds, theta, pi = preds[:3]
+    def forward(self, outp, target):
+        preds, theta, pi = outp[:3]
         l = self.loss(
             preds=preds,
             theta_disp=theta,
             pi_dropout=pi,
             truth=target,
         )
-        encoded = preds[:-1]
+        encoded = outp[-1]
         l += self.l1_lambda * torch.abs(encoded).sum()
         return l
 

@@ -342,7 +342,7 @@ class ChromDecoder(nn.Module):
                 self.final_activations["act1"] = final_activations
             else:
                 raise ValueError(
-                    f"Unrecognized type for final_activation: {type(final_activation)}"
+                    f"Unrecognized type for final_activation: {type(final_activations)}"
                 )
         logging.info(
             f"ChromDecoder with {len(self.final_activations)} output activations"
@@ -887,13 +887,11 @@ class SplicedAutoEncoder(nn.Module):
         hidden_dim: int = 16,
         final_activations1: list = [activations.Exp(), nn.Softplus()],
         final_activations2=[activations.Exp(), nn.Softplus(), nn.Sigmoid()],
-        flat_mode: bool = False,  # Controls if we have to re-split inputs
         seed=182822,
     ):
         super().__init__()
         torch.manual_seed(seed)
 
-        self.flat_mode = flat_mode
         self.input_dim1 = input_dim1
         self.input_dim2 = input_dim2
         self.num_outputs1 = (
@@ -960,8 +958,6 @@ class SplicedAutoEncoder(nn.Module):
         return self._combine_output_and_encoded(decoded, encoded, num_non_latent_out)
 
     def forward(self, x, size_factors=None, mode: Union[None, Tuple[int, int]] = None):
-        if self.flat_mode:
-            x = self.split_catted_input(x)
         assert isinstance(x, (tuple, list))
         assert len(x) == 2, "There should be two inputs to spliced autoencoder"
         encoded1 = self.encoder1(x[0])
