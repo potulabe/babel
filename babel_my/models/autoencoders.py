@@ -993,6 +993,59 @@ class SplicedAutoEncoder(nn.Module):
         return retval_dict[mode]
 
 
+class ObviousAutoEncoder(nn.Module):
+    def __init__(
+        self,
+        input_dim: int,
+        output_dim: int,
+        hidden_dim: int = 16,
+        final_activations: list = [activations.Exp(), nn.Softplus()],
+        seed=182822,
+    ):
+        super().__init__()
+        torch.manual_seed(seed)
+
+        self.input_dim = input_dim
+        self.num_outputs = (
+            len(final_activations)
+            if isinstance(final_activations, (list, set, tuple))
+            else 1
+        )
+
+        self.encoder = Encoder(num_inputs=input_dim, num_units=hidden_dim)
+
+        self.decoder = Decoder(
+            num_outputs=output_dim,
+            num_units=hidden_dim,
+            final_activation=final_activations,
+        )
+
+    def _combine_output_and_encoded(self, decoded, encoded, num_outputs: int):
+        """
+        Combines the output and encoded in a single output
+        """
+        if num_outputs > 1:
+            retval = *decoded, encoded
+        else:
+            if isinstance(decoded, tuple):
+                decoded = decoded[0]
+            retval = decoded, encoded
+        assert isinstance(retval, (list, tuple))
+        assert isinstance(
+            retval[0], (torch.TensorType, torch.Tensor)
+        ), f"Expected tensor but got {type(retval[0])}"
+        return retval
+
+    def forward(self, x):
+        encoded = self.encoder(x[1])
+
+        decoded = self.decoder(encoded)
+        retval = self._combine_output_and_encoded(
+            decoded, encoded, self.num_outputs
+        )
+        return retval
+
+
 class NaiveSplicedAutoEncoder(SplicedAutoEncoder):
     """
     Naive "spliced" autoencoder that does not use shared branches and instead simply
