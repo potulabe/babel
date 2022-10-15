@@ -177,13 +177,17 @@ class NegativeBinomialLoss(nn.Module):
 	def forward(self, outp, batch):
 		preds, theta = outp[:2]
 		target = batch[0]
+
 		l = self.loss(
 			preds=preds,
 			theta=theta,
 			truth=target,
 		)
-		encoded = outp[-1]
-		l += self.l1_lambda * torch.abs(encoded).sum()
+
+		if self.l1_lambda:
+			encoded = outp[-1]
+			l += self.l1_lambda * torch.abs(encoded).sum()
+
 		return l
 
 
